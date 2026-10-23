@@ -348,6 +348,57 @@ console.log('\n== 章節內容');
   }
   problems.forEach(m => fail(w, m)); await ctx.close();
 }
+// lesson layers (focus ring, caption bar, beat dots) on a real chapter, driven by a demo timeline; normal and wider text
+for (const size of [SIZES[0], SIZES[2], SIZES[4], SIZES[5]]) for (const wide of [false, true]) {
+  const w = `舞台疊層 ${size.n}${wide ? ' 字加寬' : ''}`;
+  const { ctx, page, problems } = await open(size, '#/c/gates');
+  await page.waitForSelector('#layout'); await page.keyboard.press('Space');
+  if (wide) await page.addStyleTag({ content: 'body { letter-spacing: .1em !important; }' });
+  await page.evaluate(async () => {
+    const L = await icDebug.layers(), p = icDebug.createPlayer({ bus: icDebug.bus });
+    const role = r => `#view svg text[data-role="${r}"]`;
+    window.__layers = L.createStageLayers({ stage: document.querySelector('#stage'), view: document.querySelector('#view'), bus: icDebug.bus, targets: id => ({ inA: document.querySelector(role('a')), outY: document.querySelector(role('y')) })[id] });
+    window.__p = p;
+    p.load([
+      { at: 0, caption: '先看整張圖' },
+      { at: 3, caption: '輸入 A 在這裡', focus: 'inA' },
+      { at: 6, caption: '輸出 Y 在這裡', focus: 'outY' },
+      { at: 9, caption: '兩者一起看', focus: ['inA', 'outY'] },
+      { at: 12, caption: '最長的字幕要能放進二十個字之內不能爆' }], { autoplay: false });
+  });
+  const probe = () => page.evaluate(() => {
+    const R = s => document.querySelector(s).getBoundingClientRect(), v = R('#view'), bar = R('.caption-bar'), ring = document.querySelector('.focus-ring'), rr = R('.focus-ring');
+    const t = id => { const e = document.querySelector(`#view svg text[data-role="${id}"]`); return e && e.getBoundingClientRect(); };
+    const dots = [...document.querySelectorAll('.cap-dots i')].map(d => d.dataset.s).join(',');
+    const cap = document.querySelector('.cap-text');
+    return { v: { l: v.left, t: v.top, r: v.right, b: v.bottom }, bar: { t: bar.top, b: bar.bottom, h: bar.height }, ringOn: ring.dataset.on, rr: { l: rr.left, t: rr.top, r: rr.right, b: rr.bottom }, a: t('a') && { l: t('a').left, t: t('a').top, r: t('a').right, b: t('a').bottom }, y: t('y') && { l: t('y').left, t: t('y').top, r: t('y').right, b: t('y').bottom },
+      dots, text: cap.textContent, overflow: cap.scrollWidth > cap.clientWidth + 1, stage: R('#stage').bottom, vis: !document.querySelector('.caption-bar').hidden, ringBox: !!ring.style.width };
+  });
+  const seeBeat = async i => { await page.evaluate(i => window.__p.seekBeat(i), i); await page.waitForTimeout(700); return probe(); };
+  const heights = [];
+  for (let i = 0; i < 5; i++) {
+    const r = await seeBeat(i); heights.push(Math.round(r.bar.h));
+    if (!r.vis) fail(w, '字幕列沒有出現');
+    if (r.overflow) fail(w, `第 ${i + 1} 小段字幕溢出`);
+    if (r.bar.t < r.v.b - 1) fail(w, '字幕列蓋到了畫面');
+    if (r.bar.b > r.stage + 1) fail(w, '字幕列超出舞台');
+    const d = r.dots; if (d !== ['now,next,next,next,next', 'done,now,next,next,next', 'done,done,now,next,next', 'done,done,done,now,next', 'done,done,done,done,now'][i]) fail(w, `第 ${i + 1} 小段的圓點狀態不對：${d}`);
+    if (i === 0 || i === 4) { if (r.ringOn === '1') fail(w, `第 ${i + 1} 小段看整張圖，不該有焦點框`); continue; }
+    if (r.ringOn !== '1') { fail(w, `第 ${i + 1} 小段應有焦點框`); continue; }
+    const tg = i === 1 ? [r.a] : i === 2 ? [r.y] : [r.a, r.y], need = { l: Math.min(...tg.map(x => x.l)), t: Math.min(...tg.map(x => x.t)), r: Math.max(...tg.map(x => x.r)), b: Math.max(...tg.map(x => x.b)) };
+    const q = r.rr; const eps = 2;
+    if (q.l > need.l + eps || q.t > need.t + eps || q.r < need.r - eps || q.b < need.b - eps) fail(w, `第 ${i + 1} 小段焦點框沒有框住目標：框 ${JSON.stringify(q)} 目標 ${JSON.stringify(need)}`);
+    if (q.l < r.v.l - eps || q.t < r.v.t - eps || q.r > r.v.r + eps || q.b > r.v.b + eps) fail(w, `第 ${i + 1} 小段焦點框跑出畫面`);
+  }
+  if (new Set(heights).size !== 1) fail(w, `字幕列高度會隨小段跳動：${heights}`);
+  const pc = await page.evaluate(pageChecks, size.touch ? 44 : 32); pc.forEach(m => fail(w, m));
+  await page.evaluate(() => window.__p.unload());
+  if (!(await page.isHidden('.caption-bar'))) fail(w, '卸載時字幕列應隱藏');
+  if ((await page.evaluate(() => document.querySelector('.focus-ring').dataset.on)) === '1') fail(w, '卸載時焦點框應隱藏');
+  if (!wide && size.n === '1280x800') await page.evaluate(() => { window.__p.load([{ at: 0, caption: '先看整張圖' }, { at: 3, caption: '輸入 A 在這裡', focus: 'inA' }, { at: 6, caption: 'x' }], { autoplay: false }); window.__p.seekBeat(1); });
+  if (!wide && size.n === '1280x800') { await page.waitForTimeout(700); await page.screenshot({ path: path.join(shots, 'layers-1280x800.png') }); }
+  problems.forEach(m => fail(w, m)); await ctx.close();
+}
 // every step of every chapter, every size: labels inside the drawing must not overlap each other, nor leave the stage.
 // Run twice: with the machine's own fonts, and with ~10% wider text — other people's phones and PCs use other CJK fonts
 // (GitHub's runner already did), so a layout that only just fits here is a layout that breaks there.

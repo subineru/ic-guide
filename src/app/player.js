@@ -53,7 +53,7 @@ export function createPlayer({ bus }) {
       setPlaying(autoplay && !beatMode);
       changed(); return api;
     },
-    unload() { tl = null; setPlaying(false); pending = null; },
+    unload() { tl = null; setPlaying(false); pending = null; lastBeat = -1; emit('player:state', null); },
 
     /* advance the clock by dt real seconds (the caller passes the frame time) */
     tick(dt) {

@@ -68,9 +68,27 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 
 /* ---------- chapter layout (desktop) ---------- */
 #layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 38%, 440px); gap: var(--s4); padding: var(--s4); max-width: 1680px; width: 100%; height: 100%; min-height: 560px; margin: 0 auto; }
-#stage { position: relative; min-height: 520px; border: 1px solid var(--line); border-radius: var(--r); background: var(--card); overflow: hidden; }
+#stage { position: relative; container: stage / inline-size; min-height: 520px; border: 1px solid var(--line); border-radius: var(--r); background: var(--card); overflow: hidden; }
 #view { position: absolute; inset: 0; }
 #view svg { width: 100%; height: 100%; display: block; }
+/* lesson layers (ui/stage-layers.js): the stage becomes drawing + caption bar; chapters without them keep the full-bleed drawing */
+#stage.has-layers { display: flex; flex-direction: column; }
+#stage.has-layers #view { position: relative; inset: auto; flex: 1 1 0; min-height: 0; }
+.stage-layers { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.focus-ring { position: absolute; border: 3px solid var(--accent); border-radius: 12px; box-shadow: 0 0 0 9999px rgba(43, 38, 32, .10), 0 0 0 2px var(--card) inset; opacity: 0; transition: left .4s ease, top .4s ease, width .4s ease, height .4s ease, opacity .25s ease; }
+.focus-ring[data-on="1"] { opacity: 1; }
+.focus-ring.jump { transition: opacity .25s ease; }
+.caption-bar { flex: none; display: grid; gap: var(--s1); padding: var(--s2) var(--s4) var(--s3); border-top: 1px solid var(--line); background: var(--paper-2); }
+.cap-text { font-size: var(--f-body); font-weight: 700; line-height: 1.45; min-height: 1.45em; overflow-wrap: anywhere; }
+.cap-text.swap { animation: cap-in .25s ease; }
+@keyframes cap-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@container stage (max-width: 520px) { .cap-text { min-height: 2.9em; } }
+.cap-meta { display: flex; align-items: center; gap: var(--s3); min-height: 16px; }
+.cap-dots { display: inline-flex; align-items: center; gap: 6px; }
+.cap-dots i { display: block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--sub); box-sizing: content-box; }
+.cap-dots i[data-s="done"] { background: var(--sub); }
+.cap-dots i[data-s="now"] { background: var(--accent); border-color: var(--accent); width: 10px; height: 10px; }
+.cap-count { font-size: var(--f-tag); color: var(--sub); font-variant-numeric: tabular-nums; }
 #stageChips { position: absolute; left: var(--s3); top: var(--s3); display: flex; gap: var(--s2); flex-wrap: wrap; max-width: calc(100% - 24px); pointer-events: none; }
 #side { display: flex; flex-direction: column; gap: var(--s3); min-height: 0; min-width: 0; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s3) var(--s4); }

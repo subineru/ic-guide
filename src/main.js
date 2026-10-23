@@ -5,6 +5,7 @@ import { createStore } from './core/store.js';
 import { NODES, PATH, SPINE } from './domain/curriculum.js';
 import { createProgress } from './domain/progress.js';
 import { createRunner } from './app/steps.js';
+import { createPlayer } from './app/player.js';
 import { createScheduler } from './app/scheduler.js';
 import { createRouter } from './app/router.js';
 import { createSettings } from './app/settings.js';
@@ -45,4 +46,4 @@ document.documentElement.dataset.ready = '1';
 const idle = globalThis.requestIdleCallback || (fn => setTimeout(fn, 200));
 idle(() => Object.keys(chapterLoaders).forEach(id => chapterLoaders[id]().then(m => { progress.register(m.default); bus.emit('progress'); })));
 
-if (/[?&]test=1/.test(location.search)) globalThis.icDebug = { bus, progress, runner, scheduler, settings };
+if (/[?&]test=1/.test(location.search)) globalThis.icDebug = { bus, progress, runner, scheduler, settings, createPlayer, layers: () => import('./ui/stage-layers.js') };

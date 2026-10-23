@@ -101,3 +101,11 @@ test('state events carry the full state', () => {
   const { p, bus } = make(); let last; bus.on('player:state', s => { last = s; });
   p.seek(3); assert.equal(last.caption, 'B'); assert.equal(last.mode, 'watch'); assert.equal(last.beatCount, 4);
 });
+
+test('unload tells listeners there is no lesson any more (state null)', () => {
+  const { p, bus } = make(), seen = [];
+  bus.on('player:state', st => seen.push(st));
+  p.unload();
+  assert.equal(seen[seen.length - 1], null);
+  assert.equal(p.state(), null);
+});
