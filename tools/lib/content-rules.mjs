@@ -1,5 +1,6 @@
 /* Content rules (spec §6.2).  Messages are in Traditional Chinese so the author can act on them directly. */
 import { len } from '../../src/core/text.js';
+import { timelineProblems } from '../../src/domain/timeline.js';
 
 export const LIMITS = { say: 40, why: 60, coreMin: 3, coreMax: 7, extMax: 4, termBudget: 5, takeaways: 3, predictQ: 40, predictOpt: 20, predictWhy: 60 };
 const LEVELS = ['core', 'ext', 'deferred'];
@@ -24,6 +25,10 @@ export function checkChapters({ chapters, glossary, path, nodes }) {
       if (!LEVELS.includes(s.level)) err(id, `${where} 的 level 必須是 core / ext / deferred`);
       if (s.level === 'deferred') return;
       if (!s.label || !s.label.zh || !s.label.en) err(id, `${where} 的標題需要中文與英文`);
+      const hasRun = typeof s.run === 'function', hasTl = Array.isArray(s.timeline) || !!(s.timeline && s.timeline.beats);
+      if (!hasRun && !hasTl) err(id, `${where} 需要 run 或 timeline 其中一個`);
+      if (hasRun && hasTl) err(id, `${where} 不可同時有 run 與 timeline`);
+      if (hasTl) timelineProblems(s.timeline, def.vocab || {}).forEach(m => err(id, `${where}的時間表：${m}`));
       if (len(s.say || '') === 0) err(id, `${where} 缺少必讀說明`);
       if (len(s.say || '') > LIMITS.say) err(id, `${where} 的必讀說明 ${len(s.say)} 字，超過 ${LIMITS.say} 字`);
       if (len(s.why || '') > LIMITS.why) err(id, `${where} 的「為什麼？」${len(s.why)} 字，超過 ${LIMITS.why} 字`);

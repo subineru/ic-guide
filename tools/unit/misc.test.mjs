@@ -62,3 +62,20 @@ test('content checker: length, positional ids, forward references and extension-
   const d = clone(basics); d.introduces = ['voltage', 'current', 'resistance', 'semiconductor', 'inverter', 'nand'];
   assert.match(run([d]).join('\n'), /核心新名詞 6 個/);
 });
+
+test('content checker: a step may use a timeline instead of run, and its beats are linted like everything else', () => {
+  const clone = o => JSON.parse(JSON.stringify(o, (k, v) => (typeof v === 'function' ? undefined : v)));
+  const withTl = (timeline, vocab = { params: ['v'], flows: [], pulses: [], targets: ['tank'] }) => {
+    const b = clone(basics); b.vocab = vocab;
+    b.steps = basics.steps.map((st, i) => (i === 0 ? { ...clone(st), timeline } : st));
+    return b;
+  };
+  const good = [{ at: 0, caption: '水位代表電壓', focus: 'tank', set: { v: 0.2 } }, { at: 2, caption: '水位升高', tween: { v: [0.2, 0.9, 1.5] } }, { at: 5, caption: '電壓變大' }];
+  const noRun = ch => { delete ch.steps[0].run; return ch; };
+  assert.deepEqual(run([noRun(withTl(good))]), []);
+  assert.match(run([noRun(withTl([{ at: 0, caption: '字'.repeat(25) }, ...good.slice(1)]))]).join('\n'), /的時間表：.*字幕 25 字，超過 20 字/);
+  assert.match(run([noRun(withTl([{ at: 0, caption: 'x', focus: 'moon' }, ...good.slice(1)]))]).join('\n'), /焦點「moon」/);
+  const both = withTl(good); both.steps[0].run = basics.steps[0].run;
+  assert.match(run([both]).join('\n'), /不可同時有 run 與 timeline/);
+  const neither = clone(basics); delete neither.steps[0].run; assert.match(run([neither]).join('\n'), /需要 run 或 timeline 其中一個/);
+});
