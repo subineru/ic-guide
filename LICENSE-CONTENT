@@ -1,0 +1,24 @@
+Licence for the teaching content
+
+The teaching content of this project (chapter text, quiz questions, diagrams and
+their descriptions): everything under `src/content/`, `docs/`, and the drawings
+produced by `src/render/` as shown to learners, is licensed under the
+Creative Commons Attribution 4.0 International licence (CC BY 4.0):
+
+    https://creativecommons.org/licenses/by/4.0/
+    https://creativecommons.org/licenses/by/4.0/legalcode
+
+You may share and adapt it, including commercially, as long as you give
+appropriate credit (project name and link), link to the licence, and indicate if
+you made changes.
+
+The program code (everything else, see `LICENSE`) is licensed under the MIT
+licence.
+
+Important: the content has NOT been reviewed by a semiconductor professional yet.
+Every page says so. Do not rely on it as technical documentation; see
+`docs/review/review-pack.md` for what is still unverified.
+
+教材內容(章節文字、小測驗、圖解與其說明:`src/content/`、`docs/`,以及呈現給學習者的圖)
+採用「創用 CC 姓名標示 4.0 國際」授權(CC BY 4.0);程式碼採用 MIT 授權(見 `LICENSE`)。
+內容尚未經過半導體專業人士審閱,請勿當作技術文件使用。

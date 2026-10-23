@@ -1,0 +1,21 @@
+{
+  "name": "ic-guide",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "IC 解構室 · 顯示驅動 IC:一個像素如何亮起",
+  "scripts": {
+    "dev": "http-server . -p 8080 -c-1",
+    "build": "node tools/build.mjs",
+    "check": "node tools/check-deps.mjs && node tools/check-content.mjs",
+    "test": "node --test \"tools/unit/*.test.mjs\"",
+    "budget": "node tools/check-budget.mjs",
+    "e2e": "node tools/e2e/layout.test.mjs",
+    "ci": "npm run check && npm test && npm run build && npm run budget && npm run e2e",
+    "review": "node tools/review-capture.mjs && node tools/make-review-doc.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "playwright": "1.56.1"
+  }
+}

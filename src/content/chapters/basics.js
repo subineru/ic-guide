@@ -1,0 +1,61 @@
+/* Chapter: electricity and semiconductors.  Audience: adults with no science background (e.g. HR).
+   Core = 3 steps; the rest is kept as `deferred` for later. Unreviewed: shown as 待審 until a reviewer signs off. */
+export default {
+  id: 'basics',
+  title: { zh: '電與半導體', en: 'Electricity & semiconductors' },
+  status: 'draft',
+  idea: { zh: '後面所有零件，都靠「用電壓控制電流」運作。先用最簡單的三個畫面，把這句話看懂。' },
+  view: 'basics.main',
+  introduces: ['voltage', 'current', 'resistance', 'semiconductor'],
+  params: { scene: 1, v: 0.3, r: 0.4, c: 0 },
+  controls: [
+    { param: 'v', label: { zh: '電壓', en: 'Voltage' }, when: { param: 'scene', in: [1] } },
+    { param: 'r', label: { zh: '電阻', en: 'Resistance' }, min: 0.2, max: 1, when: { param: 'scene', in: [1] } },
+    { param: 'c', label: { zh: '控制', en: 'Control' }, when: { param: 'scene', in: [2, 3] } },
+  ],
+  predicts: [
+    { id: 'pressure', q: '水管的水壓越大，流過的水量通常會…', options: ['變多', '變少', '不變'], answer: 0, why: '電壓像水壓：壓力差越大，流過的越多。' },
+    { id: 'narrow', q: '水管越狹窄，水就越…', options: ['難流過', '容易流過', '流得一樣'], answer: 0, why: '電阻像管子的狹窄程度：越窄越難流。' },
+    { id: 'semi', q: '半導體和一般導體最大的差別是？', options: ['導電能力可以被控制', '一定不導電', '一定比較重'], answer: 0, why: '導體一直導電、絕緣體不導電，半導體可以被控制。' },
+  ],
+  steps: [
+    { id: 'water-analogy', level: 'core', label: { zh: '電壓、電流、電阻', en: 'Voltage, current, resistance' },
+      say: '電壓像水壓，電流像水量，電阻像水管的狹窄程度。',
+      why: '水壓大、管子寬，水就流得多。比喻只幫你入門，電不是水。', uses: [],
+      run: async api => { api.set('scene', 1); api.set('v', 0.3); api.set('r', 0.4); await api.wait(0.8); await api.tween('v', 0.95, 2.6); await api.wait(0.6); await api.tween('r', 0.95, 2.6); await api.wait(0.6); } },
+    { id: 'semiconductor-controllable', level: 'core', label: { zh: '半導體可以被控制', en: 'Semiconductors can be controlled' },
+      say: '導體一直導電，絕緣體不導電，半導體可以被控制。',
+      why: '它的導電能力會隨條件改變，所以能做成想通就通、想斷就斷的零件。', uses: ['current'],
+      run: async api => { api.set('scene', 2); api.set('c', 0); await api.wait(0.8); await api.tween('c', 1, 2.6); await api.wait(0.6); await api.tween('c', 0.1, 2.6); await api.wait(0.6); } },
+    { id: 'voltage-as-switch', level: 'core', label: { zh: '用電壓當開關', en: 'Voltage as a switch' },
+      say: '在控制端加上電壓，就能決定電流通或不通。',
+      why: '控制端的電壓一變，通路就開或關。後面的電晶體就是這種開關。', uses: ['voltage', 'current'],
+      run: async api => { api.set('scene', 3); api.set('c', 0.1); await api.wait(0.8); await api.tween('c', 0.9, 2.4); await api.wait(1); await api.tween('c', 0.1, 2.4); await api.wait(0.6); } },
+    { id: 'ohm-law', level: 'deferred', label: { zh: '歐姆定律', en: "Ohm's law" }, say: '', why: '', uses: [], run: async () => {} },
+    { id: 'doping-np', level: 'deferred', label: { zh: '摻雜：N 型與 P 型', en: 'Doping: N-type and P-type' }, say: '', why: '', uses: [], run: async () => {} },
+    { id: 'pn-junction', level: 'deferred', label: { zh: 'PN 接面', en: 'PN junction' }, say: '', why: '', uses: [], run: async () => {} },
+    { id: 'diode', level: 'deferred', label: { zh: '二極體', en: 'Diode' }, say: '', why: '', uses: [], run: async () => {} },
+  ],
+  takeaways: [
+    '我能說出電壓、電流、電阻各像水管裡的什麼。',
+    '我知道半導體和導體、絕緣體的差別。',
+    '我知道可以用電壓當開關，來控制電流通不通。',
+  ],
+  verify: [
+    { claim: '電壓像水管兩端的壓力差，電流像水的流量，電阻像管子的狹窄處', status: 'ok', note: 'Wikipedia「Hydraulic analogy」明確對應這三項' },
+    { claim: '水管比喻有限度，推得太遠會造成誤解（電場、電荷種類、量子效應等無法對應）', status: 'ok', note: 'Wikipedia「Hydraulic analogy」列出多項限制' },
+    { claim: '半導體的導電能力介於導體與絕緣體之間，且可被改變', status: 'ok', note: 'Wikipedia「Semiconductor」:可由摻雜、電場、光、溫度改變' },
+    { claim: '「在控制端加上電壓就能決定通或不通」是對電晶體的簡化', status: 'part', note: '實際電晶體是連續控制，在「完全導通」與「幾乎不導通」之間切換；待審閱者確認這個簡化是否合適' },
+  ],
+  sources: [
+    { title: 'Hydraulic analogy (Wikipedia)', url: 'https://en.wikipedia.org/wiki/Hydraulic_analogy', note: '旁證' },
+    { title: 'Semiconductor (Wikipedia)', url: 'https://en.wikipedia.org/wiki/Semiconductor', note: '旁證' },
+  ],
+  simplified: [
+    '水管比喻只說明電壓、電流、電阻的關係，不解釋電場與電荷的真實行為。',
+    '圖中的數量都是示意用的「畫面大小」，不是真實的伏特、安培或歐姆。',
+    '只畫「電流」的流向（由左到右），不畫電子；電流方向與電子實際移動方向相反，本章不談。',
+    '這裡不談半導體為什麼能被控制（N 型、P 型、PN 接面），留給之後的延伸步驟。',
+    '第 3 步的「開關」是示意：真實的電晶體是連續控制，這裡只看「通」與「斷」兩端。',
+  ],
+};
