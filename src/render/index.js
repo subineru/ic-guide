@@ -2,4 +2,5 @@
 export const viewLoaders = {
   'basics.main': () => import('./r2d/views/basics-main.js'),
   'gates.logic': () => import('./r2d/views/gates-logic.js'),
+  'gates.inverter': () => import('./r2d/views/gates-inverter.js'),
 };

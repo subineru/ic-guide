@@ -18,13 +18,14 @@ const bus = createBus(), store = createStore();
 const settings = createSettings({ store, bus, systemReducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches });
 const progress = createProgress({ store, bus });
 const runner = createRunner({ bus });
+const player = createPlayer({ bus });
 const scheduler = createScheduler();
 const router = createRouter({ bus });
 
 const trial = /[?&]trial=1(&|$)/.test(location.search) ? createTrial({ store }) : null;      // trial-reading mode: absent unless asked for
 
 const ctx = {
-  bus, store, settings, progress, runner, scheduler, router, trial,
+  bus, store, settings, progress, runner, player, scheduler, router, trial,
   build: window.CF_BUILD || document.querySelector('meta[name=build]')?.content || '',
   nodes: NODES, path: PATH, spine: SPINE,
   nodeOf: id => NODES.find(n => n.id === id),
@@ -46,4 +47,4 @@ document.documentElement.dataset.ready = '1';
 const idle = globalThis.requestIdleCallback || (fn => setTimeout(fn, 200));
 idle(() => Object.keys(chapterLoaders).forEach(id => chapterLoaders[id]().then(m => { progress.register(m.default); bus.emit('progress'); })));
 
-if (/[?&]test=1/.test(location.search)) globalThis.icDebug = { bus, progress, runner, scheduler, settings, createPlayer, layers: () => import('./ui/stage-layers.js') };
+if (/[?&]test=1/.test(location.search)) globalThis.icDebug = { bus, progress, runner, player, scheduler, settings };

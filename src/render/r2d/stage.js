@@ -50,6 +50,7 @@ export function mountView({ host, settings, label, layouts, build }) {
   if (ro) ro.observe(host);
   return {
     update(P, dt) { last = P; cur.view.update(P, dt); },
+    targets: id => (cur.view.targets ? cur.view.targets(id) : null),
     dispose() { if (ro) ro.disconnect(); if (cur) cur.svg.remove(); },
   };
 }

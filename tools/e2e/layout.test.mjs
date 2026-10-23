@@ -329,16 +329,9 @@ console.log('\n== 章節內容');
 {
   const size = SIZES[0], w = '邏輯閘';
   const { ctx, page, problems } = await open(size, '#/c/gates');
-  await page.waitForSelector('#layout'); await page.keyboard.press('Space');                       // freeze the step so manual toggles stick
+  await page.waitForSelector('#layout'); await page.click('.step >> nth=1'); await page.keyboard.press('Space');   // NAND (old runner): freeze the step so manual toggles stick
   const set = async (name, on) => { const box = page.locator(`label.toggle:has-text("${name}") input`); if ((await box.isChecked()) !== !!on) await box.click(); };
   const read = async () => { await page.waitForTimeout(350); return page.evaluate(() => { const v = document.querySelector('#view svg'); const t = r => (document.querySelector(`#view svg text[data-role="${r}"]`) || {}).textContent; return { y: v.dataset.y, up: v.dataset.pullup, down: v.dataset.pulldown, scene: v.dataset.scene, a: t('a'), b: t('b2'), a2: t('a2'), y1: t('y'), y2: t('y2') }; }); };
-  await page.click('.step >> nth=0');
-  if (!(await page.isHidden('label.toggle:has-text("輸入 B")'))) fail(w, '反相器只有一個輸入，不應顯示輸入 B');
-  for (const a of [0, 1]) {
-    await set('輸入 A', a); const r = await read(); const want = a ? 0 : 1;
-    if (r.scene !== '1' || r.y !== String(want) || r.y1 !== String(want) || r.a !== String(a)) fail(w, `反相器 A=${a} 應輸出 ${want}，畫面：${JSON.stringify(r)}`);
-    if (r.up === r.down) fail(w, `反相器 A=${a}：上拉與下拉不該同時（或同時不）導通：${JSON.stringify(r)}`);
-  }
   await page.click('.step >> nth=1');
   if (await page.isHidden('label.toggle:has-text("輸入 B")')) fail(w, 'NAND 應顯示輸入 B');
   for (const [a, b] of [[0, 0], [0, 1], [1, 0], [1, 1]]) {
@@ -348,55 +341,76 @@ console.log('\n== 章節內容');
   }
   problems.forEach(m => fail(w, m)); await ctx.close();
 }
-// lesson layers (focus ring, caption bar, beat dots) on a real chapter, driven by a demo timeline; normal and wider text
+// the inverter lesson (timeline + stage layers) on every size, normal and wider text: caption bar, beat dots, focus ring on the right things
 for (const size of [SIZES[0], SIZES[2], SIZES[4], SIZES[5]]) for (const wide of [false, true]) {
-  const w = `舞台疊層 ${size.n}${wide ? ' 字加寬' : ''}`;
+  const w = `反相器教學 ${size.n}${wide ? ' 字加寬' : ''}`;
   const { ctx, page, problems } = await open(size, '#/c/gates');
-  await page.waitForSelector('#layout'); await page.keyboard.press('Space');
+  await page.waitForSelector('#layout');
   if (wide) await page.addStyleTag({ content: 'body { letter-spacing: .1em !important; }' });
-  await page.evaluate(async () => {
-    const L = await icDebug.layers(), p = icDebug.createPlayer({ bus: icDebug.bus });
-    const role = r => `#view svg text[data-role="${r}"]`;
-    window.__layers = L.createStageLayers({ stage: document.querySelector('#stage'), view: document.querySelector('#view'), bus: icDebug.bus, targets: id => ({ inA: document.querySelector(role('a')), outY: document.querySelector(role('y')) })[id] });
-    window.__p = p;
-    p.load([
-      { at: 0, caption: '先看整張圖' },
-      { at: 3, caption: '輸入 A 在這裡', focus: 'inA' },
-      { at: 6, caption: '輸出 Y 在這裡', focus: 'outY' },
-      { at: 9, caption: '兩者一起看', focus: ['inA', 'outY'] },
-      { at: 12, caption: '最長的字幕要能放進二十個字之內不能爆' }], { autoplay: false });
-  });
+  await page.click('.step >> nth=0'); await page.waitForSelector('.caption-bar:not([hidden])');
+  await page.evaluate(() => icDebug.player.pause());
+  const n = await page.evaluate(() => icDebug.player.beatCount);
   const probe = () => page.evaluate(() => {
-    const R = s => document.querySelector(s).getBoundingClientRect(), v = R('#view'), bar = R('.caption-bar'), ring = document.querySelector('.focus-ring'), rr = R('.focus-ring');
-    const t = id => { const e = document.querySelector(`#view svg text[data-role="${id}"]`); return e && e.getBoundingClientRect(); };
-    const dots = [...document.querySelectorAll('.cap-dots i')].map(d => d.dataset.s).join(',');
-    const cap = document.querySelector('.cap-text');
-    return { v: { l: v.left, t: v.top, r: v.right, b: v.bottom }, bar: { t: bar.top, b: bar.bottom, h: bar.height }, ringOn: ring.dataset.on, rr: { l: rr.left, t: rr.top, r: rr.right, b: rr.bottom }, a: t('a') && { l: t('a').left, t: t('a').top, r: t('a').right, b: t('a').bottom }, y: t('y') && { l: t('y').left, t: t('y').top, r: t('y').right, b: t('y').bottom },
-      dots, text: cap.textContent, overflow: cap.scrollWidth > cap.clientWidth + 1, stage: R('#stage').bottom, vis: !document.querySelector('.caption-bar').hidden, ringBox: !!ring.style.width };
+    const R = e => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, h: r.height }; };
+    const ring = document.querySelector('.focus-ring'), cap = document.querySelector('.cap-text'), beat = icDebug.player.timeline.beats[icDebug.player.beat];
+    const targets = beat.focus.filter(f => f !== 'whole').map(f => { const e = document.querySelector(`#view [data-target="${f}"]`); return e ? R(e) : null; });
+    return { v: R(document.querySelector('#view')), bar: R(document.querySelector('.caption-bar')), stage: R(document.querySelector('#stage')), ring: R(ring), ringOn: ring.dataset.on,
+      focus: beat.focus, targets, dots: [...document.querySelectorAll('.cap-dots i')].map(d => d.dataset.s).join(','), text: cap.textContent, want: beat.caption, overflow: cap.scrollWidth > cap.clientWidth + 1 };
   });
-  const seeBeat = async i => { await page.evaluate(i => window.__p.seekBeat(i), i); await page.waitForTimeout(700); return probe(); };
   const heights = [];
-  for (let i = 0; i < 5; i++) {
-    const r = await seeBeat(i); heights.push(Math.round(r.bar.h));
-    if (!r.vis) fail(w, '字幕列沒有出現');
-    if (r.overflow) fail(w, `第 ${i + 1} 小段字幕溢出`);
-    if (r.bar.t < r.v.b - 1) fail(w, '字幕列蓋到了畫面');
-    if (r.bar.b > r.stage + 1) fail(w, '字幕列超出舞台');
-    const d = r.dots; if (d !== ['now,next,next,next,next', 'done,now,next,next,next', 'done,done,now,next,next', 'done,done,done,now,next', 'done,done,done,done,now'][i]) fail(w, `第 ${i + 1} 小段的圓點狀態不對：${d}`);
-    if (i === 0 || i === 4) { if (r.ringOn === '1') fail(w, `第 ${i + 1} 小段看整張圖，不該有焦點框`); continue; }
-    if (r.ringOn !== '1') { fail(w, `第 ${i + 1} 小段應有焦點框`); continue; }
-    const tg = i === 1 ? [r.a] : i === 2 ? [r.y] : [r.a, r.y], need = { l: Math.min(...tg.map(x => x.l)), t: Math.min(...tg.map(x => x.t)), r: Math.max(...tg.map(x => x.r)), b: Math.max(...tg.map(x => x.b)) };
-    const q = r.rr; const eps = 2;
-    if (q.l > need.l + eps || q.t > need.t + eps || q.r < need.r - eps || q.b < need.b - eps) fail(w, `第 ${i + 1} 小段焦點框沒有框住目標：框 ${JSON.stringify(q)} 目標 ${JSON.stringify(need)}`);
-    if (q.l < r.v.l - eps || q.t < r.v.t - eps || q.r > r.v.r + eps || q.b > r.v.b + eps) fail(w, `第 ${i + 1} 小段焦點框跑出畫面`);
+  for (let i = 0; i < n; i++) {
+    await page.evaluate(i => icDebug.player.seekBeat(i), i); await page.waitForTimeout(700);
+    const r = await probe(), at = `第 ${i + 1} 小段`; heights.push(Math.round(r.bar.h));
+    if (r.text !== r.want) fail(w, `${at}字幕不對：「${r.text}」`);
+    if (r.overflow) fail(w, `${at}字幕溢出`);
+    if (r.bar.t < r.v.b - 1) fail(w, `${at}字幕列蓋到了畫面`);
+    if (r.bar.b > r.stage.b + 1) fail(w, `${at}字幕列超出舞台`);
+    const want = Array.from({ length: n }, (_, k) => (k < i ? 'done' : k === i ? 'now' : 'next')).join(',');
+    if (r.dots !== want) fail(w, `${at}圓點狀態不對：${r.dots}`);
+    const whole = r.focus.every(f => f === 'whole');
+    if (whole) { if (r.ringOn === '1') fail(w, `${at}看整張圖，不該有焦點框`); continue; }
+    if (r.targets.some(t => !t)) { fail(w, `${at}焦點目標在畫面上找不到：${r.focus}`); continue; }
+    if (r.ringOn !== '1') { fail(w, `${at}應有焦點框`); continue; }
+    const need = { l: Math.min(...r.targets.map(x => x.l)), t: Math.min(...r.targets.map(x => x.t)), r: Math.max(...r.targets.map(x => x.r)), b: Math.max(...r.targets.map(x => x.b)) }, q = r.ring, e = 2;
+    if (q.l > need.l + e || q.t > need.t + e || q.r < need.r - e || q.b < need.b - e) fail(w, `${at}焦點框沒有框住目標：框 ${JSON.stringify(q)} 目標 ${JSON.stringify(need)}`);
+    if (q.l < r.v.l - e || q.t < r.v.t - e || q.r > r.v.r + e || q.b > r.v.b + e) fail(w, `${at}焦點框跑出畫面`);
+    if (!wide && size.n === '1280x800' && (i === 2 || i === 3)) await page.screenshot({ path: path.join(shots, `inverter-beat${i + 1}-1280x800.png`) });
   }
   if (new Set(heights).size !== 1) fail(w, `字幕列高度會隨小段跳動：${heights}`);
-  const pc = await page.evaluate(pageChecks, size.touch ? 44 : 32); pc.forEach(m => fail(w, m));
-  await page.evaluate(() => window.__p.unload());
-  if (!(await page.isHidden('.caption-bar'))) fail(w, '卸載時字幕列應隱藏');
-  if ((await page.evaluate(() => document.querySelector('.focus-ring').dataset.on)) === '1') fail(w, '卸載時焦點框應隱藏');
-  if (!wide && size.n === '1280x800') await page.evaluate(() => { window.__p.load([{ at: 0, caption: '先看整張圖' }, { at: 3, caption: '輸入 A 在這裡', focus: 'inA' }, { at: 6, caption: 'x' }], { autoplay: false }); window.__p.seekBeat(1); });
-  if (!wide && size.n === '1280x800') { await page.waitForTimeout(700); await page.screenshot({ path: path.join(shots, 'layers-1280x800.png') }); }
+  (await page.evaluate(pageChecks, size.touch ? 44 : 32)).forEach(m => fail(w, m));
+  await click(page, size, '.step >> nth=1');                                                   // NAND uses the old runner: no caption bar, no ring
+  await page.waitForTimeout(300);
+  if (!(await page.isHidden('.caption-bar'))) fail(w, '換到沒有時間表的步驟時字幕列應隱藏');
+  if ((await page.evaluate(() => document.querySelector('.focus-ring').dataset.on)) === '1') fail(w, '換步驟後焦點框應隱藏');
+  problems.forEach(m => fail(w, m)); await ctx.close();
+}
+// the inverter's physics, sampled along the whole timeline: never both switches closed, water moves only while a flow shows, and a flow always moves water
+{
+  const size = SIZES[0], w = '反相器水桶';
+  const { ctx, page, problems } = await open(size, '#/c/gates');
+  await page.waitForSelector('#layout'); await page.click('.step >> nth=0'); await page.waitForSelector('.caption-bar:not([hidden])');
+  await page.evaluate(() => icDebug.player.pause());
+  const samples = await page.evaluate(async () => {
+    const out = [], P = icDebug.player, v = document.querySelector('#view svg');
+    for (let t = 0; t <= P.duration + 1e-6; t += 0.25) { P.seek(t); await new Promise(r => setTimeout(r, 70)); out.push({ t, ...v.dataset }); }
+    return out;
+  });
+  samples.forEach((s, i) => {
+    if (s.up === '1' && s.down === '1') fail(w, `${s.t}s 上下開關同時接通`);
+    if (s.flow === 'fill' && s.up !== '1') fail(w, `${s.t}s 灌水但上方開關沒接通`);
+    if (s.flow === 'drain' && s.down !== '1') fail(w, `${s.t}s 排水但下方開關沒接通`);
+    if (i > 0) {
+      const p = samples[i - 1], dl = Math.abs(Number(s.level) - Number(p.level));
+      if (dl > 0.02 && s.flow === 'none' && p.flow === 'none') fail(w, `${s.t}s 水位在變，畫面卻沒有水流`);
+      if (s.flow !== 'none' && p.flow !== 'none' && dl < 0.004) fail(w, `${s.t}s 一直有水流，水位卻不動（流動應該是暫態）`);
+    }
+  });
+  const at = t => samples.find(x => Math.abs(x.t - t) < 0.01);
+  const first = samples[0], mid = at(7.5), done = at(13.5), last = samples[samples.length - 1];
+  if (first.a !== '0' || first.y !== '1' || first.level !== '1.00') fail(w, `開頭應是輸入 0、水桶滿、輸出 1：${JSON.stringify(first)}`);
+  if (mid.a !== '1') fail(w, `7.5s 輸入應已撥到 1：${JSON.stringify(mid)}`);
+  if (done.y !== '0' || done.level !== '0.00' || done.down !== '1') fail(w, `13.5s 應排空、輸出 0、下方接通：${JSON.stringify(done)}`);
+  if (last.y !== '1' || last.level !== '1.00' || last.up !== '1' || last.a !== '0') fail(w, `結尾應回到輸入 0、水桶滿、輸出 1：${JSON.stringify(last)}`);
   problems.forEach(m => fail(w, m)); await ctx.close();
 }
 // every step of every chapter, every size: labels inside the drawing must not overlap each other, nor leave the stage.

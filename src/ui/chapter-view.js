@@ -2,13 +2,15 @@
 import { h, clear, isTyping } from './dom.js';
 import { bi, biPlain, zh } from '../core/text.js';
 import { SPEEDS } from '../app/steps.js';
+import { createStageLayers } from './stage-layers.js';
 
 export async function createChapterView(ctx, id) {
-  const { bus, progress, runner, scheduler, settings } = ctx;
+  const { bus, progress, runner, player, scheduler, settings } = ctx;
   const def = (await ctx.loadChapter(id)).default;
   progress.register(def);
   const steps = def.steps.filter(s => s.level === 'core' || s.level === 'ext');
-  let index = -1, view = null, disposed = false;
+  let index = -1, disposed = false, tlMode = false;                  // tlMode: the current step is a timeline (player) rather than a run() (runner)
+  let curView = null, curViewId = null, wantViewId = def.view, viewTok = 0;
 
   /* ---------- stage ---------- */
   const viewHost = h('div', { id: 'view' });
@@ -16,6 +18,10 @@ export async function createChapterView(ctx, id) {
     h('div', { id: 'stageChips' },
       h('span', { class: 'chip', title: '關係與順序正確，比例不代表實際尺寸' }, '示意 · 非實際比例'),
       h('span', { class: 'chip warn' }, def.placeholder ? '版面示意 · 內容待填' : def.reviewed ? '已審' : '待審' + (def.partial ? ' · 未完成' : ''))));
+
+  /* lesson layers (focus ring, caption bar, beat dots) exist only for chapters that have timeline steps */
+  const layers = steps.some(s => s.timeline)
+    ? createStageLayers({ stage, view: viewHost, bus, targets: id => (curView && curView.targets ? curView.targets(id) : null) }) : null;
 
   /* ---------- card ---------- */
   const cardTitle = h('h2', { id: 'cardTitle' }), cardSay = h('p', { id: 'cardSay' });
@@ -63,11 +69,14 @@ export async function createChapterView(ctx, id) {
   }
 
   /* ---------- controls ---------- */
-  const playBtn = h('button', { class: 'btn primary', type: 'button', id: 'bPlay', 'aria-label': '暫停或繼續', onclick: () => { runner.togglePause(); ctx.poke(); } }, '⏸ 暫停');
+  const playBtn = h('button', { class: 'btn primary', type: 'button', id: 'bPlay', 'aria-label': '暫停或繼續', onclick: () => { if (tlMode) player.toggle(); else runner.togglePause(); ctx.poke(); } }, '⏸ 暫停');
   const prevBtn = h('button', { class: 'btn', type: 'button', id: 'bPrev', onclick: () => select(Math.max(0, index - 1)) }, '◀ 上一步');
   const nextBtn = h('button', { class: 'btn', type: 'button', id: 'bNext', onclick: () => select(Math.min(steps.length - 1, index + 1)) }, '下一步 ▶');
   const nudgeBtn = h('button', { class: 'btn', type: 'button', id: 'bNudge', title: '暫停時前進一小段（快捷鍵 .）', onclick: () => { runner.nudge(0.25); ctx.poke(); } }, '單步 ⏭');
-  const speedSel = h('select', { id: 'speed', 'aria-label': '播放速度', onchange: e => { runner.setSpeed(Number(e.target.value)); } },
+  const replayBtn = h('button', { class: 'btn', type: 'button', id: 'bReplay', title: '重播目前這一小段', onclick: () => { player.replayBeat(); ctx.poke(); } }, '⟲ 重播這一小段');
+  const restartBtn = h('button', { class: 'btn', type: 'button', id: 'bRestart', onclick: () => { player.seekBeat(0); player.play(); ctx.poke(); } }, '⏮ 從頭');
+  const tlRow = h('div', { class: 'row tl-row', hidden: true }, replayBtn, restartBtn);
+  const speedSel = h('select', { id: 'speed', 'aria-label': '播放速度', onchange: e => { runner.setSpeed(Number(e.target.value)); player.setSpeed(Number(e.target.value)); } },
     SPEEDS.map(v => h('option', { value: v, selected: v === 1 ? true : null }, v + '×')));
   /* chapter controls: a slider (amount) or a toggle (0 / 1); `when` shows a control only for the scenes where it matters */
   const widgets = (def.controls || []).map(c => {
@@ -81,11 +90,12 @@ export async function createChapterView(ctx, id) {
     return { c, row: h('label', { class: 'slider' }, h('span', { html: bi(c.label) }), input, out), sync() { const v = Number(runner.P[c.param] || 0); if (Number(input.value) !== v) input.value = v; out.textContent = v.toFixed(2); } };
   });
   function syncControls() {
-    widgets.forEach(w => { const when = w.c.when; w.row.hidden = !!when && !when.in.includes(runner.P[when.param]); w.sync(); });
+    widgets.forEach(w => { const when = w.c.when; w.row.hidden = tlMode || (!!when && !when.in.includes(runner.P[when.param])); w.sync(); });
+    nudgeBtn.hidden = tlMode; tlRow.hidden = !tlMode;
   }
   const more = h('details', { class: 'more' }, h('summary', null, '更多控制'),
     h('div', { class: 'row' }, nudgeBtn, h('label', { class: 'speed' }, h('span', null, '速度'), speedSel)), widgets.map(x => x.row));
-  const controls = h('section', { id: 'controls', 'aria-label': '播放控制' }, h('div', { class: 'row primary' }, prevBtn, playBtn, nextBtn), more);
+  const controls = h('section', { id: 'controls', 'aria-label': '播放控制' }, h('div', { class: 'row primary' }, prevBtn, playBtn, nextBtn), tlRow, more);
   const wideMq = matchMedia('(min-width: 1024px)');
   /* the chapter's own controls are its main interaction, so keep them open (also on phones); only a chapter without controls collapses them */
   const syncMore = () => { more.open = wideMq.matches || widgets.length > 0; }; syncMore(); wideMq.addEventListener('change', syncMore);
@@ -130,25 +140,42 @@ export async function createChapterView(ctx, id) {
     cardTitle.innerHTML = bi(s.label); cardSay.textContent = s.say;
     whyBody.textContent = s.why; why.hidden = !s.why; why.open = false;
     prevBtn.disabled = i <= 0; nextBtn.disabled = i >= steps.length - 1;
-    runner.reset(Object.assign({}, def.params)); syncControls(); renderPredict();
+    tlMode = !!s.timeline; useView(s.view || def.view);
+    runner.cancel(); runner.reset(Object.assign({}, def.params, s.params));
+    if (tlMode) player.load(s.timeline, { initial: s.params || {}, autoplay: true }); else player.unload();
+    syncControls(); syncPlayLabel(); renderPredict();
     renderSteps(); ctx.poke();
     if (trial) trial.add('step-start', { chapter: id, step: s.id });
-    runner.play(s).then(ok => { if (ok && !disposed) { if (trial) trial.add('step-done', { chapter: id, step: s.id }); if (progress.markStep(id, s.id)) { renderSteps(); renderTakeaways(); } } });
+    if (!tlMode) runner.play(s).then(ok => { if (ok && !disposed) stepDone(s); });
+  }
+  function stepDone(s) { if (trial) trial.add('step-done', { chapter: id, step: s.id }); if (progress.markStep(id, s.id)) { renderSteps(); renderTakeaways(); } }
+  const syncPlayLabel = () => { const p = tlMode ? !player.playing : runner.paused; playBtn.textContent = p ? '▶ 繼續' : '⏸ 暫停'; playBtn.classList.toggle('paused', p); };
+  /* a step may bring its own view (the inverter does); the old one is replaced once the new one has loaded */
+  async function useView(vid) {
+    const tok = ++viewTok; wantViewId = vid;
+    if (curViewId === vid) return;
+    const mod = await ctx.loadView(vid);
+    if (disposed || tok !== viewTok) return;
+    if (curView) curView.dispose();
+    curView = mod.create({ host: viewHost, bus, settings }); curViewId = vid; ctx.poke();
   }
   function onKey(e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === 'ArrowRight') { select(Math.min(steps.length - 1, index + 1)); e.preventDefault(); }
     else if (e.key === 'ArrowLeft') { if (index > 0) select(index - 1); e.preventDefault(); }
-    else if (e.key === ' ' && !isTyping(e.target)) { runner.togglePause(); ctx.poke(); e.preventDefault(); }
-    else if (e.key === '.' && !isTyping(e.target)) { runner.nudge(0.25); ctx.poke(); }
+    else if (e.key === ' ' && !isTyping(e.target)) { if (tlMode) player.toggle(); else runner.togglePause(); ctx.poke(); e.preventDefault(); }
+    else if (e.key === '.' && !isTyping(e.target)) { if (tlMode) player.nextBeat(); else runner.nudge(0.25); ctx.poke(); }
     else if (/^[1-9]$/.test(e.key) && !isTyping(e.target) && steps[Number(e.key) - 1]) select(Number(e.key) - 1);
     else if ((e.key === 'h' || e.key === 'H') && !isTyping(e.target)) document.getElementById('app').classList.toggle('clean');
     else if (e.key === 'Escape') bus.emit('ui:escape');
   }
   document.addEventListener('keydown', onKey);
   const offs = [
-    bus.on('runner:paused', p => { playBtn.textContent = p ? '▶ 繼續' : '⏸ 暫停'; playBtn.classList.toggle('paused', p); }),
+    bus.on('runner:paused', () => { if (!tlMode) syncPlayLabel(); }),
     bus.on('runner:active', a => scheduler.setBusy('anim', a)),
+    bus.on('player:playing', p => { scheduler.setBusy('player', p); if (tlMode) syncPlayLabel(); }),
+    bus.on('player:state', () => { if (!player.playing) scheduler.poke(); }),
+    bus.on('player:end', () => { if (tlMode && index >= 0 && !disposed) stepDone(steps[index]); }),
     bus.on('param', () => { scheduler.poke(300); syncControls(); }),
   ];
 
@@ -157,16 +184,19 @@ export async function createChapterView(ctx, id) {
   ctx.setSpine(def.spine || ctx.nodeOf(id).spine);
   if (trial) { trial.add('enter', { chapter: id }); stuckCount(); }
 
-  const loaded = (await ctx.loadView(def.view)).create({ host: viewHost, bus, settings });
-  view = loaded;
-  scheduler.start((dt) => { runner.tick(dt); if (view) view.update(runner.P, dt); });
+  await useView(def.view);
+  scheduler.start(dt => {
+    if (tlMode) player.tick(dt); else runner.tick(dt);
+    if (curView && curViewId === wantViewId) curView.update(tlMode ? player.state() : runner.P, dt);
+  });
 
   return {
     el,
     dispose() {
       disposed = true; document.removeEventListener('keydown', onKey); wideMq.removeEventListener('change', syncMore);
-      offs.forEach(f => f()); runner.cancel(); scheduler.stop(); scheduler.setBusy('anim', false);
-      if (view) view.dispose();
+      offs.forEach(f => f()); runner.cancel(); player.unload(); scheduler.stop(); scheduler.setBusy('anim', false); scheduler.setBusy('player', false);
+      if (curView) curView.dispose();
+      if (layers) layers.dispose();
     },
   };
 }

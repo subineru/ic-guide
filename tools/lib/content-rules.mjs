@@ -28,7 +28,7 @@ export function checkChapters({ chapters, glossary, path, nodes }) {
       const hasRun = typeof s.run === 'function', hasTl = Array.isArray(s.timeline) || !!(s.timeline && s.timeline.beats);
       if (!hasRun && !hasTl) err(id, `${where} 需要 run 或 timeline 其中一個`);
       if (hasRun && hasTl) err(id, `${where} 不可同時有 run 與 timeline`);
-      if (hasTl) timelineProblems(s.timeline, def.vocab || {}).forEach(m => err(id, `${where}的時間表：${m}`));
+      if (hasTl) timelineProblems(s.timeline, s.vocab || def.vocab || {}).forEach(m => err(id, `${where}的時間表：${m}`));
       if (len(s.say || '') === 0) err(id, `${where} 缺少必讀說明`);
       if (len(s.say || '') > LIMITS.say) err(id, `${where} 的必讀說明 ${len(s.say)} 字，超過 ${LIMITS.say} 字`);
       if (len(s.why || '') > LIMITS.why) err(id, `${where} 的「為什麼？」${len(s.why)} 字，超過 ${LIMITS.why} 字`);

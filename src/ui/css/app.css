@@ -235,6 +235,7 @@ kbd { font: inherit; font-size: var(--f-tag); border: 1px solid var(--line); bor
   #main { overflow: visible; }
   #layout { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0; padding: var(--s3); gap: var(--s3); }
   #stage { min-height: 320px; height: min(56dvh, 620px); }
+  #stage.has-layers { height: calc(min(56dvh, 620px) + 96px); }
   #steps { overflow: visible; }
   #steps ol { display: flex; overflow-x: auto; padding-bottom: var(--s1); }
   #steps li { flex: none; }
