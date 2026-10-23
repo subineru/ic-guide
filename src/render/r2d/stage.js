@@ -9,16 +9,16 @@ function createText(svg, host, W, H) {
   const make = (parent, x, y, zh, en, o = {}) => {
     const t = s('text', { x, y, 'text-anchor': o.anchor || 'middle', fill: o.fill || 'var(--ink)', 'font-weight': o.bold ? 700 : null });
     const a = s('tspan', null, zh); t.append(a);
-    let b = null; if (en) { b = s('tspan', { x, fill: 'var(--sub)' }); b.textContent = en; t.append(b); }
+    let b = null; if (en) { b = s('tspan', { x, fill: o.same ? (o.fill || 'var(--ink)') : 'var(--sub)' }); b.textContent = en; t.append(b); }   // o.same: a second line of the same weight, not a gray translation
     if (o.role) t.dataset.role = o.role;
-    items.push({ t, b, base: o.size || 16, digit: !!o.digit });
+    items.push({ t, b, base: o.size || 16, digit: !!o.digit, same: !!o.same });
     (parent || svg).append(t); return t;
   };
   const fit = () => {
     const scale = Math.max(0.2, Math.min((host.clientWidth || W) / W, (host.clientHeight || H) / H));   // viewBox units -> CSS px
     const want = 12 / scale;                                                                             // units that render as 12 px
-    items.forEach(({ t, b, base, digit }) => {
-      const big = Math.max(base, want * (digit ? 1.6 : 1.1)), small = Math.max(base * 0.8, want);
+    items.forEach(({ t, b, base, digit, same }) => {
+      const big = Math.max(base, want * (digit ? 1.6 : 1.1)), small = same ? big : Math.max(base * 0.8, want);
       t.setAttribute('font-size', big.toFixed(1));
       if (b) { b.setAttribute('font-size', small.toFixed(1)); b.setAttribute('dy', (small * 1.35).toFixed(1)); }
     });

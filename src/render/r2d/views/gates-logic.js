@@ -48,9 +48,11 @@ export function create({ host, settings }) {
       rail(gA, cx - 100, cx + 100, bot, false, '低電壓（地）', 'Low', bot + 34);
       sa.append(s('path', { d: `M${cx} ${top} V${upY} M${cx} ${upY + sl} V${downY} M${cx} ${downY + sl} V${bot}` }));
       const setUp = vsw(gA, sa, cx, upY, sl), setDown = vsw(gA, sa, cx, downY, sl);
-      /* on a narrow stage the switch labels go to the LEFT of the wire: the right side belongs to the output badge and its caption */
-      txt.make(gA, N ? cx - 24 : cx + 24, upY + 30, '輸入 0 時接通', null, { anchor: N ? 'end' : 'start', size: 15 });
-      txt.make(gA, N ? cx - 24 : cx + 24, downY + 30, '輸入 1 時接通', null, { anchor: N ? 'end' : 'start', size: 15 });
+      /* switch labels: one line on a wide stage, two SHORT lines on a narrow one (CJK font widths differ between machines, so narrow labels stay short) */
+      const swLabel = (g, x, y, one, two, anchor) => (N ? txt.make(g, x, y - 8, two[0], two[1], { anchor, size: 15, same: true }) : txt.make(g, x, y, one, null, { anchor, size: 15 }));
+      /* narrow: labels go to the LEFT of the wire, the right side belongs to the output badge and its caption */
+      swLabel(gA, N ? cx - 24 : cx + 24, upY + 30, '輸入 0 時接通', ['輸入 0 時', '接通'], N ? 'end' : 'start');
+      swLabel(gA, N ? cx - 24 : cx + 24, downY + 30, '輸入 1 時接通', ['輸入 1 時', '接通'], N ? 'end' : 'start');
       const inX = N ? 60 : 150, outX = N ? W - 60 : 650;
       const outWire = s('path', { fill: 'none', 'stroke-linecap': 'round' }); gA.append(outWire);
       const outLine = `M${cx} ${nodeY} H${outX - 26}`;
@@ -69,10 +71,10 @@ export function create({ host, settings }) {
       sb.append(s('path', { d: `M${bx} ${nY} V${d1} M${bx} ${d1 + sl} V${d2} M${bx} ${d2 + sl} V${bbot}` }));
       sb.append(s('circle', { cx: bx, cy: nY, r: 6, fill: 'var(--ink)' }));
       const upA = vsw(gB, sb, bx - dx, ubY, sl), upB = vsw(gB, sb, bx + dx, ubY, sl), dnA = vsw(gB, sb, bx, d1, sl), dnB = vsw(gB, sb, bx, d2, sl);
-      txt.make(gB, bx - dx - 22, ubY + 32, 'A＝0 時接通', null, { anchor: 'end', size: 15 });
-      txt.make(gB, bx + dx + 22, ubY + 32, 'B＝0 時接通', null, { anchor: 'start', size: 15 });
-      txt.make(gB, N ? bx - 24 : bx + 24, d1 + 32, 'A＝1 時接通', null, { anchor: N ? 'end' : 'start', size: 15 });     // narrow: left of the wire, the right side holds the output
-      txt.make(gB, N ? bx - 24 : bx + 24, d2 + 32, 'B＝1 時接通', null, { anchor: N ? 'end' : 'start', size: 15 });
+      swLabel(gB, bx - dx - 22, ubY + 32, 'A＝0 時接通', ['A＝0 時', '接通'], 'end');
+      swLabel(gB, bx + dx + 22, ubY + 32, 'B＝0 時接通', ['B＝0 時', '接通'], 'start');
+      swLabel(gB, N ? bx - 24 : bx + 24, d1 + 32, 'A＝1 時接通', ['A＝1 時', '接通'], N ? 'end' : 'start');     // narrow: left of the wire, the right side holds the output
+      swLabel(gB, N ? bx - 24 : bx + 24, d2 + 32, 'B＝1 時接通', ['B＝1 時', '接通'], N ? 'end' : 'start');
       const aX = N ? 56 : 140, outX2 = N ? W - 56 : 650, aY = N ? 260 : 150, bY = N ? 380 : 330;
       const outWire2 = s('path', { fill: 'none', 'stroke-linecap': 'round' }); gB.append(outWire2);
       const outLine2 = `M${bx} ${nY} H${outX2 - 26}`;

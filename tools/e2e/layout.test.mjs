@@ -348,10 +348,13 @@ console.log('\n== 章節內容');
   }
   problems.forEach(m => fail(w, m)); await ctx.close();
 }
-// every step of every chapter, every size: labels inside the drawing must not overlap each other, nor leave the stage
-for (const size of SIZES.filter(x => ['1280x800', '1024x768', '414x800', '360x740'].includes(x.n))) {
+// every step of every chapter, every size: labels inside the drawing must not overlap each other, nor leave the stage.
+// Run twice: with the machine's own fonts, and with ~10% wider text — other people's phones and PCs use other CJK fonts
+// (GitHub's runner already did), so a layout that only just fits here is a layout that breaks there.
+for (const wide of [false, true]) for (const size of SIZES.filter(x => ['1280x800', '1024x768', '414x800', '360x740'].includes(x.n))) {
   for (const [chapter, nSteps] of [['basics', 3], ['gates', 2]]) {
     const { ctx, page, problems } = await open(size, '#/c/' + chapter);
+    if (wide) await page.addStyleTag({ content: '#view svg text, #view svg tspan { letter-spacing: 0.1em; }' });
     await page.waitForSelector('#layout'); await page.keyboard.press('Space');
     for (let i = 0; i < nSteps; i++) {
       await (size.touch ? page.tap(`.step >> nth=${i}`) : page.click(`.step >> nth=${i}`)); await page.waitForTimeout(450);
@@ -367,7 +370,7 @@ for (const size of SIZES.filter(x => ['1280x800', '1024x768', '414x800', '360x74
         }
         return out;
       });
-      bad.forEach(m => fail(`圖內文字 ${chapter} 第 ${i + 1} 步 ${size.n}`, m));
+      bad.forEach(m => fail(`圖內文字${wide ? '(字加寬)' : ''} ${chapter} 第 ${i + 1} 步 ${size.n}`, m));
     }
     problems.forEach(m => fail(`圖內文字 ${chapter} ${size.n}`, m)); await ctx.close();
   }
