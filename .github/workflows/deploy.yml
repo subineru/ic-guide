@@ -1,28 +1,40 @@
 # Publishes the site to GitHub Pages: `main` at the root, branches proto/* and feat/* as previews under /preview/<branch>/.
-# In the repository: Settings -> Pages -> Source = "GitHub Actions", and
-# Settings -> Environments -> github-pages -> Deployment branches: add `proto/*` and `feat/*` next to `main`.
+# In the repository: Settings -> Pages -> Source = "GitHub Actions".  Nothing else to configure.
+#
+# The real deployment always runs on `main` (the github-pages environment only lets main deploy by default).
+# A push to a proto/* or feat/* branch only asks `main` to run the deployment again (the `relay` job), and that run
+# builds main plus every preview branch from scratch, so previews update and none disappears.
 name: deploy
 on:
   push:
     branches: [main, 'proto/**', 'feat/**']
   workflow_dispatch:
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-concurrency:
-  group: pages
-  cancel-in-progress: true
 jobs:
-  deploy:
+  relay:
+    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - run: gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: true
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main            # the site root is always main, whichever branch triggered this run
           fetch-depth: 0       # previews need every branch
       - run: git fetch origin '+refs/heads/proto/*:refs/remotes/origin/proto/*' '+refs/heads/feat/*:refs/remotes/origin/feat/*' || true
       - uses: actions/setup-node@v4
