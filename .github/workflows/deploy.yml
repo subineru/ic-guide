@@ -1,8 +1,10 @@
-# Publishes dist/ to GitHub Pages.  In the repository: Settings -> Pages -> Source = "GitHub Actions".
+# Publishes the site to GitHub Pages: `main` at the root, branches proto/* and feat/* as previews under /preview/<branch>/.
+# In the repository: Settings -> Pages -> Source = "GitHub Actions", and
+# Settings -> Environments -> github-pages -> Deployment branches: add `proto/*` and `feat/*` next to `main`.
 name: deploy
 on:
   push:
-    branches: [main]
+    branches: [main, 'proto/**', 'feat/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +21,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main            # the site root is always main, whichever branch triggered this run
+          fetch-depth: 0       # previews need every branch
+      - run: git fetch origin '+refs/heads/proto/*:refs/remotes/origin/proto/*' '+refs/heads/feat/*:refs/remotes/origin/feat/*' || true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -28,9 +34,10 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run budget
+      - run: node tools/assemble-pages.mjs site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: site
       - id: deployment
         uses: actions/deploy-pages@v4
